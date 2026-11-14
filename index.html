@@ -95,9 +95,26 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
       <label style="display:flex;align-items:center;gap:8px;color:var(--ink);font-size:15px"><input type="checkbox" id="rmBg" checked style="width:18px;height:18px"> Remove background</label>
       <div class="grid" style="margin-top:10px">
         <button class="ghost" onclick="nextCrop()">Skip</button>
-        <button class="primary" style="margin-top:0" onclick="cropSave()">Save piece</button>
+        <button class="primary" style="margin-top:0" onclick="cropSave()">Next</button>
       </div>
       <p class="tip" id="cropCount" style="color:var(--muted);font-size:12px"></p>
+    </div>
+  </section>
+
+  <section id="view-clean" class="hidden">
+    <div class="card">
+      <div style="background:repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 50% / 16px 16px;border-radius:12px;overflow:hidden">
+        <canvas id="cleanCanvas" style="width:100%;display:block"></canvas>
+      </div>
+      <label>Background strength: <span id="tolVal">50</span></label>
+      <input type="range" id="tol" min="15" max="110" value="50" oninput="document.getElementById('tolVal').textContent=this.value" onchange="applyTol()">
+      <p class="tip" style="font-size:12px;color:var(--muted)">Lower it if parts of the garment disappear. Raise it if background is left behind.</p>
+      <div class="chips" style="margin:10px 0"><span class="chip" id="eraseBtn" onclick="toggleErase()">Erase leftover background: off</span></div>
+      <p class="tip" style="font-size:12px;color:var(--muted)">With erase on, drag over any leftover background to remove it.</p>
+      <div class="grid">
+        <button class="ghost" onclick="backToCrop()">Back</button>
+        <button class="primary" style="margin-top:0" onclick="cleanSave()">Save piece</button>
+      </div>
     </div>
   </section>
 
@@ -195,7 +212,7 @@ function loadImg(src) {
 
 // Removes the background by flood-filling from the edges through pixels close to the edge colour.
 // Garment pixels that are enclosed by the garment are kept, even if they resemble the background.
-function removeBg(cnv) {
+function removeBg(cnv, tol = 50) {
   const w = cnv.width, h = cnv.height;
   const ctx = cnv.getContext('2d');
   const d = ctx.getImageData(0, 0, w, h), p = d.data;
@@ -204,7 +221,7 @@ function removeBg(cnv) {
   for (let x = 0; x < w; x++) { add(x * 4); add(((h - 1) * w + x) * 4); }
   for (let y = 0; y < h; y++) { add(y * w * 4); add((y * w + w - 1) * 4); }
   r /= n; g /= n; b /= n;
-  const T = 50 * 50;
+  const T = tol * tol;
   const near = pix => { const k = pix * 4; const dr = p[k]-r, dg = p[k+1]-g, db = p[k+2]-b; return dr*dr + dg*dg + db*db < T; };
   const vis = new Uint8Array(w * h), q = new Int32Array(w * h);
   let qh = 0, qt = 0;
@@ -227,7 +244,7 @@ const cutCacheP = {};
 function cutImg(src) {
   if (cutCacheP[src]) return cutCacheP[src];
   cutCacheP[src] = (async () => {
-    if (src.startsWith('data:image/png')) return loadImg(src);
+    if (src.startsWith('data:image/png')) return loadImg(trimCanvas(await loadImg(src)).toDataURL('image/png'));
     const img = await loadImg(src);
     const c = document.createElement('canvas');
     c.width = img.naturalWidth; c.height = img.naturalHeight;
@@ -357,6 +374,7 @@ function show(name) {
     if (tab) tab.classList.toggle('on', n === name);
   });
   document.getElementById('view-crop').classList.add('hidden');
+  document.getElementById('view-clean').classList.add('hidden');
   if (name === 'wardrobe') renderWardrobe();
   if (name === 'tryon') renderTry();
 }
@@ -378,6 +396,7 @@ function nextCrop() {
   const f = cropQueue.shift();
   if (!f) { show('wardrobe'); return; }
   document.getElementById('view-add').classList.add('hidden');
+  document.getElementById('view-clean').classList.add('hidden');
   document.getElementById('view-crop').classList.remove('hidden');
   cropRect = { x:5, y:5, w:90, h:90 };
   const img = document.getElementById('cropImg');
@@ -419,7 +438,110 @@ function drawCropBox() {
   handle.addEventListener('pointerdown', e => { e.stopPropagation(); start(e, 'resize'); });
 })();
 
-async function cropSave() {
+let cropCanvas = null;
+let eraseOn = false;
+
+// Step 1 of saving: crop the photo into a canvas and open the clean-up screen
+function cropSave() {
+  const img = document.getElementById('cropImg');
+  const W = img.naturalWidth, H = img.naturalHeight;
+  const sx = cropRect.x / 100 * W, sy = cropRect.y / 100 * H;
+  const sw = cropRect.w / 100 * W, sh = cropRect.h / 100 * H;
+  const s = Math.min(1, 700 / Math.max(sw, sh));
+  cropCanvas = document.createElement('canvas');
+  cropCanvas.width = Math.max(1, Math.round(sw * s));
+  cropCanvas.height = Math.max(1, Math.round(sh * s));
+  cropCanvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, cropCanvas.width, cropCanvas.height);
+  eraseOn = false;
+  document.getElementById('eraseBtn').textContent = 'Erase leftover background: off';
+  document.getElementById('view-crop').classList.add('hidden');
+  document.getElementById('view-clean').classList.remove('hidden');
+  applyTol();
+}
+
+// Redraws the clean-up canvas from the crop, with the current background strength
+function applyTol() {
+  const cc = document.getElementById('cleanCanvas');
+  cc.width = cropCanvas.width; cc.height = cropCanvas.height;
+  const ctx = cc.getContext('2d');
+  ctx.clearRect(0, 0, cc.width, cc.height);
+  ctx.drawImage(cropCanvas, 0, 0);
+  if (document.getElementById('rmBg').checked) removeBg(cc, Number(document.getElementById('tol').value));
+}
+
+function toggleErase() {
+  eraseOn = !eraseOn;
+  document.getElementById('eraseBtn').textContent = 'Erase leftover background: ' + (eraseOn ? 'on' : 'off');
+  document.getElementById('cleanCanvas').style.touchAction = eraseOn ? 'none' : 'auto';
+}
+
+function backToCrop() {
+  document.getElementById('view-clean').classList.add('hidden');
+  document.getElementById('view-crop').classList.remove('hidden');
+}
+
+(function bindErase() {
+  const cc = document.getElementById('cleanCanvas');
+  let drawing = false;
+  const dab = e => {
+    const r = cc.getBoundingClientRect();
+    const k = cc.width / r.width;
+    const x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k;
+    const ctx = cc.getContext('2d');
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath(); ctx.arc(x, y, 22 * k, 0, Math.PI * 2); ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+  };
+  cc.addEventListener('pointerdown', e => {
+    if (!eraseOn) return;
+    e.preventDefault(); drawing = true;
+    cc.setPointerCapture(e.pointerId); dab(e);
+  });
+  cc.addEventListener('pointermove', e => { if (drawing) dab(e); });
+  cc.addEventListener('pointerup', () => { drawing = false; });
+})();
+
+// Copies an image or canvas to a new canvas
+function toCanvas(src) {
+  const c = document.createElement('canvas');
+  c.width = src.naturalWidth || src.width;
+  c.height = src.naturalHeight || src.height;
+  c.getContext('2d').drawImage(src, 0, 0);
+  return c;
+}
+
+// Crops a transparent piece to the bounds of its visible pixels, so its edges
+// line up with the garment's real shoulders, hips and hem during auto-fit.
+function trimCanvas(src) {
+  const c = toCanvas(src);
+  const w = c.width, h = c.height;
+  const p = c.getContext('2d').getImageData(0, 0, w, h).data;
+  let minX = w, maxX = -1, minY = h, maxY = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (p[(y * w + x) * 4 + 3] >= 128) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < 0) return c;
+  const out = document.createElement('canvas');
+  out.width = maxX - minX + 1;
+  out.height = maxY - minY + 1;
+  out.getContext('2d').drawImage(c, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
+  return out;
+}
+
+// Step 2 of saving: store the cleaned piece, trimmed to the garment
+async function cleanSave() {
+  const data = trimCanvas(document.getElementById('cleanCanvas')).toDataURL('image/png');
+  const slot = await guessSlot(data);
+  const colours = await detectColour(data);
+  items.push({ id: String(Date.now() + Math.random()), img: data, cat: slot, colour: colours[0], colours });
+  save();
+  nextCrop();
+}
+
+async function cropSaveOld() {
   const img = document.getElementById('cropImg');
   const W = img.naturalWidth, H = img.naturalHeight;
   const sx = cropRect.x / 100 * W, sy = cropRect.y / 100 * H;
@@ -636,10 +758,11 @@ function startDrag(e, t) {
     t.y = oy + (ev.clientY - sy) / rect.height * 100;
     el.style.left = t.x + '%'; el.style.top = t.y + '%';
   };
-  const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); renderPiecesOnStage(); };
+  const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); updateScaleSlider(); };
   el.addEventListener('pointermove', mv);
   el.addEventListener('pointerup', up);
-  renderPiecesOnStage();
+  document.querySelectorAll('.piece').forEach(n => n.classList.toggle('sel', n === el));
+  updateScaleSlider();
 }
 function updateScaleSlider() {
   const t = tryItems.find(x => x.id === selId);
