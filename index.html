@@ -20,7 +20,7 @@ label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
 select, input[type=file], input[type=range] { width:100%; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--ink); font-size:15px; }
 input[type=range] { padding:0; }
 .chips { display:flex; flex-wrap:wrap; gap:6px; }
-.chip { padding:6px 11px; border:1px solid var(--line); border-radius:99px; font-size:13px; background:var(--bg); color:var(--ink); }
+.chip { padding:8px 14px; border:1px solid var(--line); border-radius:99px; font-size:14px; background:var(--bg); color:var(--ink); }
 .chip.on { background:var(--accent); color:#fff; border-color:var(--accent); }
 button.primary { width:100%; padding:13px; margin-top:12px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-size:16px; font-weight:600; }
 button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(--card); color:var(--ink); border-radius:10px; font-size:14px; }
@@ -34,7 +34,6 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
 .outfit figure { margin:0; text-align:center; font-size:12px; color:var(--muted); }
 .outfit img { width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:12px; background:var(--line); }
 .tip { font-size:14px; line-height:1.5; margin:8px 0; }
-.tag { display:inline-block; font-size:11px; padding:2px 7px; border-radius:6px; background:var(--line); margin-right:4px; text-transform:capitalize; }
 .empty { color:var(--muted); font-size:14px; text-align:center; padding:20px 0; }
 .hidden { display:none !important; }
 .stage { position:relative; width:100%; touch-action:none; user-select:none; }
@@ -44,7 +43,7 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
 .piece.sel { outline:2px dashed var(--accent); outline-offset:2px; }
 .thumbbtn { padding:0; border:2px solid transparent; border-radius:10px; overflow:hidden; background:none; }
 .thumbbtn.in { border-color:var(--accent); }
-#status { font-size:13px; color:var(--muted); min-height:18px; margin:8px 0; }
+.swatch { display:inline-block; width:10px; height:10px; border-radius:50%; border:1px solid var(--line); vertical-align:middle; margin-right:4px; }
 </style>
 </head>
 <body>
@@ -53,51 +52,40 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
   <nav>
     <button id="tab-wardrobe" class="on" onclick="show('wardrobe')">Wardrobe</button>
     <button id="tab-add" onclick="show('add')">Add</button>
-    <button id="tab-today" onclick="show('today')">Outfit</button>
+    <button id="tab-outfit" onclick="show('outfit')">Outfit</button>
     <button id="tab-tryon" onclick="show('tryon')">Try on</button>
     <button id="tab-trends" onclick="show('trends')">Trends</button>
   </nav>
 </header>
 
 <main>
+  <!-- WARDROBE -->
   <section id="view-wardrobe">
-    <div class="card">
-      <label>Filter by category</label>
-      <select id="filterCat" onchange="renderWardrobe()"></select>
-    </div>
+    <div class="chips" id="filterChips" style="margin-bottom:14px"></div>
     <div id="wardrobeGrid" class="grid"></div>
-    <div id="wardrobeEmpty" class="empty hidden">No clothes yet. Tap Add to upload your first piece.</div>
+    <div id="wardrobeEmpty" class="empty hidden">Nothing here yet. Tap Add to upload photos.</div>
   </section>
 
+  <!-- ADD -->
   <section id="view-add" class="hidden">
     <div class="card">
-      <label>Photo of the item (flat-lay on a plain white or light background works best)</label>
+      <label>Photos (flat-lay on a plain light background works best)</label>
       <input type="file" id="photo" accept="image/*" multiple>
       <div id="previews" class="grid" style="margin-top:10px"></div>
-      <label>Category</label>
-      <select id="cat"></select>
-      <label>Colour</label>
-      <select id="colour">
-        <option>black</option><option>white</option><option>grey</option><option>navy</option>
-        <option>blue</option><option>denim</option><option>beige</option><option>olive</option>
-        <option>brown</option><option>green</option><option>red</option><option>maroon</option>
-        <option>pastel</option><option>print/pattern</option><option>other</option>
-      </select>
-      <label>Good for (tap all that apply)</label>
-      <div id="occChips" class="chips"></div>
-      <button class="primary" onclick="saveItems()">Save to wardrobe</button>
+      <p class="tip" style="font-size:12px;color:var(--muted)">Each photo is sorted into top, bottom or shoes, and its colour is detected, automatically. If one is wrong, tap Move on its card in the wardrobe.</p>
+      <button class="primary" onclick="saveItems()">Save</button>
     </div>
   </section>
 
-  <section id="view-today" class="hidden">
+  <!-- OUTFIT -->
+  <section id="view-outfit" class="hidden">
     <div class="card">
-      <label>Occasion</label>
-      <div id="todayOcc" class="chips"></div>
-      <button class="primary" onclick="generateOutfit()">Suggest an outfit</button>
+      <button class="primary" style="margin-top:0" onclick="generateOutfit()">Suggest an outfit</button>
     </div>
     <div id="outfitBox"></div>
   </section>
 
+  <!-- TRY ON -->
   <section id="view-tryon" class="hidden">
     <div class="card">
       <label>Your full-body photo (plain background, stays on this phone)</label>
@@ -106,12 +94,8 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
     <div id="tryEmpty" class="card empty">Upload your photo above to start.</div>
     <div id="tryArea" class="hidden">
       <div class="card">
-        <div id="stage" class="stage">
-          <img id="tryBase" class="base" alt="">
-        </div>
-        <div id="status"></div>
-        <button class="primary" style="margin-top:4px" onclick="autoFit()">Auto-fit pieces to me</button>
-        <p class="tip" style="font-size:12px;color:var(--muted)">Auto-fit places each piece using your shoulders, hips, and feet. Drag to fine-tune. Tap a piece to select it, then resize below.</p>
+        <div id="stage" class="stage"><img id="tryBase" class="base" alt=""></div>
+        <p class="tip" style="font-size:12px;color:var(--muted)">Drag a piece onto the right spot. Tap a piece to select it, then resize with the slider.</p>
         <label>Size of selected piece</label>
         <input type="range" id="scale" min="10" max="100" value="50" oninput="scaleSel(this.value)">
         <div class="grid" style="margin-top:10px">
@@ -121,68 +105,48 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
         <button class="primary" onclick="savePhoto()">Save image</button>
       </div>
       <div class="card">
-        <label>Pick pieces to add</label>
+        <label>Tap pieces to add</label>
         <div id="tryPicker" class="grid3"></div>
         <div id="tryEmptyPicker" class="empty hidden">Add items to your wardrobe first.</div>
       </div>
     </div>
   </section>
 
+  <!-- TRENDS -->
   <section id="view-trends" class="hidden">
     <div class="card">
-      <p class="tip"><b>Oversized tee + baggy or cargo bottoms.</b> Balance it with clean white sneakers. Relaxed top, relaxed bottom, clean footwear.</p>
-      <p class="tip"><b>Smart casual shirt + structured trousers.</b> Earthy colours like olive, beige and brown are strong this year. Light blue shirts stay a safe office pick.</p>
-      <p class="tip"><b>Layering.</b> Hoodie or overshirt over a tee for casual days. Structured jacket over a shirt for evenings. Keep it light for Hyderabad heat.</p>
-      <p class="tip"><b>Ethnic fusion.</b> Short kurta over jeans or churidar for parties and festivals. Fine embroidery beats heavy ornamentation.</p>
-      <p class="tip"><b>Shoes.</b> Clean white sneakers are the easy default. Loafers or leather shoes for office. Platform loafers and structured boots are the look of this year.</p>
+      <p class="tip"><b>Oversized tee + baggy or cargo bottoms.</b> Balance it with clean white sneakers.</p>
+      <p class="tip"><b>Earthy colours.</b> Olive, beige and brown are strong this year. Light blue shirts stay a safe pick.</p>
+      <p class="tip"><b>Layering.</b> Hoodie or overshirt over a tee. Structured jacket over a shirt. Keep it light for Hyderabad heat.</p>
+      <p class="tip"><b>Ethnic fusion.</b> Short kurta over jeans. Fine embroidery beats heavy ornamentation.</p>
       <p class="tip"><b>Basics win.</b> A few well-fitting neutrals repeat better than many loud pieces.</p>
-      <p class="tip" style="color:var(--muted);font-size:12px">Based on 2026 men's fashion coverage from Indian fashion sites. Edit this text anytime in the file.</p>
+      <p class="tip" style="color:var(--muted);font-size:12px">Based on 2026 men's fashion coverage from Indian fashion sites.</p>
     </div>
   </section>
 </main>
 
 <script>
-const CATS = {
-  top: ['shirt','tshirt','polo','sweatshirt','kurta'],
-  bottom: ['jeans','trousers','cargo','shorts','joggers'],
-  layer: ['jacket','blazer','hoodie'],
-  shoes: ['sneakers','formal','loafers','sandals','sports']
-};
-const GROUP_OF = {};
-Object.entries(CATS).forEach(([g, list]) => list.forEach(c => GROUP_OF[c] = g));
-const ALL_CATS = Object.values(CATS).flat();
-const OCCASIONS = ['office','party','casual','gym'];
-const NEUTRALS = ['black','white','grey','navy','denim','beige','olive','brown'];
-const FIT = {
-  office: { top:['shirt','polo'], bottom:['trousers','jeans'], layer:['blazer','jacket'], shoes:['formal','loafers'] },
-  party:  { top:['shirt','tshirt','kurta'], bottom:['jeans','trousers','cargo'], layer:['jacket','blazer'], shoes:['formal','loafers','sneakers'] },
-  casual: { top:['tshirt','shirt','polo','sweatshirt'], bottom:['jeans','cargo','shorts','trousers','joggers'], layer:['hoodie','jacket'], shoes:['sneakers','sandals','loafers'] },
-  gym:    { top:['tshirt'], bottom:['joggers','shorts'], layer:[], shoes:['sports','sneakers'] }
-};
+const SLOTS = ['top', 'bottom', 'layer', 'shoes'];
+const SLOT_LABEL = { top:'Top', bottom:'Bottom', layer:'Layer', shoes:'Shoes' };
 const DEFAULT_POS = {
   top:    { x:22, y:22, w:56 },
   layer:  { x:20, y:20, w:60 },
   bottom: { x:26, y:46, w:48 },
   shoes:  { x:26, y:84, w:48 }
 };
-const TIPS = {
-  office: 'Keep the top neat and the bottom structured. A blazer or jacket finishes it. Leather shoes or clean loafers.',
-  party: 'Go a little bolder. A clean shirt or kurta with dark jeans or trousers. Add a chain or watch if you like.',
-  casual: 'Relaxed fit on top and bottom. Clean sneakers keep it sharp.',
-  gym: 'Breathable top, quick-dry bottoms. Keep it simple.'
-};
-// MediaPipe Pose Landmarker, loaded on first use. Model and wasm are fetched from Google/jsDelivr.
-const MP_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
-const MP_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
-const MP_MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+const NEUTRALS = ['black','white','grey','navy','denim','beige','olive','brown'];
 
 let items = JSON.parse(localStorage.getItem('wd_items') || '[]');
 let history = JSON.parse(localStorage.getItem('wd_history') || '[]');
+const OLD_TO_SLOT = { jeans:'bottom', trousers:'bottom', cargo:'bottom', shorts:'bottom', joggers:'bottom',
+  sneakers:'shoes', formal:'shoes', loafers:'shoes', sandals:'shoes', sports:'shoes',
+  jacket:'layer', blazer:'layer', hoodie:'layer' };
+items.forEach(i => { if (!['top','bottom','layer','shoes'].includes(i.cat)) i.cat = OLD_TO_SLOT[i.cat] || 'top'; });
 let pendingPhotos = [];
-let todayOcc = null;
+let chosenSlot = null;
+let filter = 'all';
 let tryItems = [];
 let selId = null;
-let poseLandmarker = null;
 const cutCache = {};
 
 function save() {
@@ -191,7 +155,6 @@ function save() {
     localStorage.setItem('wd_history', JSON.stringify(history));
   } catch (e) { alert('Storage is full. Delete some items or use smaller photos.'); }
 }
-function setStatus(t) { document.getElementById('status').textContent = t; }
 
 function shrink(file, max = 700) {
   return new Promise(res => {
@@ -207,7 +170,7 @@ function shrink(file, max = 700) {
   });
 }
 
-// Removes a plain/light background so the piece floats over your photo.
+// Removes a plain/light background. Returns an Image with transparency.
 function cutout(src) {
   if (cutCache[src]) return cutCache[src];
   cutCache[src] = new Promise(res => {
@@ -233,9 +196,71 @@ function cutout(src) {
   return cutCache[src];
 }
 
+// ----- colour detection -----
+// Averages the visible (non-background) pixels, then maps the average to a named colour.
+async function detectColour(src) {
+  const cut = await cutout(src);
+  const c = document.createElement('canvas');
+  const s = Math.min(1, 120 / Math.max(cut.naturalWidth, cut.naturalHeight));
+  c.width = Math.max(1, cut.naturalWidth * s); c.height = Math.max(1, cut.naturalHeight * s);
+  const x = c.getContext('2d');
+  x.drawImage(cut, 0, 0, c.width, c.height);
+  const p = x.getImageData(0, 0, c.width, c.height).data;
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < p.length; i += 4) {
+    if (p[i+3] < 128) continue;
+    r += p[i]; g += p[i+1]; b += p[i+2]; n++;
+  }
+  if (!n) return 'other';
+  return nameColour(r / n, g / n, b / n);
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0));
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+  }
+  return { h, s, l };
+}
+
+function nameColour(r, g, b) {
+  const { h, s, l } = rgbToHsl(r, g, b);
+  if (s < 0.12) {
+    if (l < 0.18) return 'black';
+    if (l > 0.85) return 'white';
+    return 'grey';
+  }
+  if (l > 0.75) return 'pastel';
+  if (h >= 190 && h < 255) {
+    if (l < 0.3) return 'navy';
+    if (s < 0.35) return 'denim';
+    return 'blue';
+  }
+  if (h >= 18 && h < 45) {
+    if (s < 0.5 && l > 0.5) return 'beige';
+    if (l < 0.42) return 'brown';
+    return 'brown';
+  }
+  if (h >= 45 && h < 75 && s < 0.4) return 'beige';
+  if (h >= 60 && h < 110 && s < 0.6) return 'olive';
+  if (h >= 75 && h < 170) return 'green';
+  if (h >= 255 && h < 330) return 'purple';
+  // reds, pinks and maroons
+  if (l < 0.35) return 'maroon';
+  return 'red';
+}
+
 // ----- navigation -----
 function show(name) {
-  ['wardrobe','add','today','tryon','trends'].forEach(n => {
+  ['wardrobe','add','outfit','tryon','trends'].forEach(n => {
     document.getElementById('view-' + n).classList.toggle('hidden', n !== name);
     document.getElementById('tab-' + n).classList.toggle('on', n === name);
   });
@@ -243,16 +268,15 @@ function show(name) {
   if (name === 'tryon') renderTry();
 }
 
-function setupForms() {
-  document.getElementById('filterCat').innerHTML = '<option value="all">All</option>' + ALL_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
-  document.getElementById('cat').innerHTML = ALL_CATS.map(c => `<option value="${c}">${c}</option>`).join('');
-  document.getElementById('occChips').innerHTML = OCCASIONS.map(o => `<span class="chip" data-occ="${o}" onclick="this.classList.toggle('on')">${o}</span>`).join('');
-  document.getElementById('todayOcc').innerHTML = OCCASIONS.map(o => `<span class="chip" data-occ="${o}" onclick="pickToday(this)">${o}</span>`).join('');
+function setupChips() {
+  document.getElementById('filterChips').innerHTML =
+    ['all', ...SLOTS].map(s => `<span class="chip ${s === filter ? 'on' : ''}" onclick="setFilter('${s}')">${s === 'all' ? 'All' : SLOT_LABEL[s]}</span>`).join('');
 }
-function pickToday(el) {
-  document.querySelectorAll('#todayOcc .chip').forEach(c => c.classList.remove('on'));
-  el.classList.add('on'); todayOcc = el.dataset.occ;
+function pickSlot(el) {
+  document.querySelectorAll('#slotChips .chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on'); chosenSlot = el.dataset.slot;
 }
+function setFilter(f) { filter = f; setupChips(); renderWardrobe(); }
 
 // ----- add items -----
 document.getElementById('photo').addEventListener('change', async e => {
@@ -265,35 +289,76 @@ document.getElementById('photo').addEventListener('change', async e => {
   }
 });
 
-function saveItems() {
+async function saveItems() {
   if (!pendingPhotos.length) return alert('Pick at least one photo.');
-  const cat = document.getElementById('cat').value;
-  const colour = document.getElementById('colour').value;
-  const occ = [...document.querySelectorAll('#occChips .chip.on')].map(c => c.dataset.occ);
-  if (!occ.length) return alert('Tap at least one occasion.');
-  pendingPhotos.forEach(img => items.push({ id: String(Date.now() + Math.random()), img, cat, colour, occ }));
+  for (const img of pendingPhotos) {
+    const cut = await cutout(img);
+    const slot = guessSlot(cut);
+    const colour = await detectColour(img);
+    items.push({ id: String(Date.now() + Math.random()), img, cat: slot, colour });
+  }
   save();
   pendingPhotos = [];
   document.getElementById('photo').value = '';
   document.getElementById('previews').innerHTML = '';
-  document.querySelectorAll('#occChips .chip').forEach(c => c.classList.remove('on'));
   show('wardrobe');
+}
+
+// Guesses top / bottom / shoes from the item's outline.
+// Tall and narrow = trousers or jeans. Wide and sparse = a pair of shoes. Everything else = top.
+// This is a shape guess, not recognition, so Move fixes any miss.
+function guessSlot(cut) {
+  const c = document.createElement('canvas');
+  const s = Math.min(1, 200 / Math.max(cut.naturalWidth, cut.naturalHeight));
+  c.width = Math.max(1, Math.round(cut.naturalWidth * s));
+  c.height = Math.max(1, Math.round(cut.naturalHeight * s));
+  const x = c.getContext('2d');
+  x.drawImage(cut, 0, 0, c.width, c.height);
+  const p = x.getImageData(0, 0, c.width, c.height).data;
+  let minX = c.width, maxX = 0, minY = c.height, maxY = 0, opaque = 0;
+  for (let y = 0; y < c.height; y++) {
+    for (let xx = 0; xx < c.width; xx++) {
+      if (p[(y * c.width + xx) * 4 + 3] >= 128) {
+        opaque++;
+        if (xx < minX) minX = xx; if (xx > maxX) maxX = xx;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+    }
+  }
+  const bw = Math.max(1, maxX - minX + 1), bh = Math.max(1, maxY - minY + 1);
+  const ratio = bh / bw;                  // height / width of the item
+  const fill = opaque / (bw * bh);        // how much of its box is filled
+  if (ratio < 0.8 && fill < 0.55) return 'shoes';
+  if (ratio > 1.35) return 'bottom';
+  return 'top';
+}
+
+const NEXT_SLOT = { top:'bottom', bottom:'layer', layer:'shoes', shoes:'top' };
+function moveItem(id) {
+  const it = items.find(i => i.id === id);
+  if (!it) return;
+  it.cat = NEXT_SLOT[it.cat] || 'top';
+  save(); renderWardrobe();
 }
 
 // ----- wardrobe -----
 function renderWardrobe() {
-  const f = document.getElementById('filterCat').value;
-  const list = items.filter(i => f === 'all' || i.cat === f);
+  const list = items.filter(i => filter === 'all' || i.cat === filter);
   document.getElementById('wardrobeEmpty').classList.toggle('hidden', list.length > 0);
   document.getElementById('wardrobeGrid').innerHTML = list.map(i => `
     <div class="item">
       <img src="${i.img}" alt="">
       <div class="meta">
-        <b>${i.cat} · ${i.colour}</b>
-        <div style="margin:4px 0">${i.occ.map(o => `<span class="tag">${o}</span>`).join('')}</div>
-        <button class="ghost" onclick="removeItem('${i.id}')">Delete</button>
+        <b>${SLOT_LABEL[i.cat]}</b>
+        <span class="swatch" style="background:${swatchFor(i.colour)}"></span>${i.colour}
+        <div style="margin-top:6px;display:flex;gap:6px"><button class="ghost" onclick="moveItem('${i.id}')">Move</button><button class="ghost" onclick="removeItem('${i.id}')">Delete</button></div>
       </div>
     </div>`).join('');
+}
+function swatchFor(c) {
+  return { black:'#111', white:'#fafafa', grey:'#888', navy:'#1f2a44', denim:'#5b7fa6', blue:'#3f6fb5',
+           beige:'#d8c8a8', olive:'#6b7040', brown:'#6b4a2f', green:'#3c7a4a', red:'#c0392b',
+           maroon:'#6d1f2a', pastel:'#f4c7d6', purple:'#7d4f9b', other:'#999' }[c] || '#999';
 }
 function removeItem(id) {
   if (!confirm('Delete this item?')) return;
@@ -317,12 +382,12 @@ function pick(pool) {
 }
 
 function generateOutfit() {
-  if (!todayOcc) return alert('Pick an occasion first.');
-  const rules = FIT[todayOcc];
-  const pool = g => items.filter(i => i.occ.includes(todayOcc) && rules[g].includes(i.cat));
-  const tops = pool('top'), bottoms = pool('bottom'), layers = pool('layer'), shoes = pool('shoes');
+  const tops = items.filter(i => i.cat === 'top');
+  const bottoms = items.filter(i => i.cat === 'bottom');
+  const layers = items.filter(i => i.cat === 'layer');
+  const shoes = items.filter(i => i.cat === 'shoes');
   if (!tops.length || !bottoms.length) {
-    document.getElementById('outfitBox').innerHTML = `<div class="card empty">Add at least one top and one bottom tagged "${todayOcc}" to get an outfit.</div>`;
+    document.getElementById('outfitBox').innerHTML = `<div class="card empty">Add at least one top and one bottom to get an outfit.</div>`;
     return;
   }
   let best = null, bestScore = -99;
@@ -331,23 +396,16 @@ function generateOutfit() {
     const s = colourScore(t, b) + Math.random() * 0.5;
     if (s > bestScore) { bestScore = s; best = { t, b }; }
   }
-  let shoe = null;
-  if (shoes.length) {
-    const neutralShoes = shoes.filter(s => NEUTRALS.includes(s.colour));
-    shoe = pick(neutralShoes.length ? neutralShoes : shoes);
-  }
-  let layer = null;
-  const wantLayer = layers.length && (todayOcc === 'office' || todayOcc === 'party' ? Math.random() < 0.7 : todayOcc === 'casual' ? Math.random() < 0.4 : false);
-  if (wantLayer) layer = pick(layers);
-
-  const ids = [best.t, best.b, layer, shoe].filter(Boolean).map(i => i.id);
-  const fig = i => `<figure><img src="${i.img}"><br>${i.cat} · ${i.colour}</figure>`;
+  const shoe = shoes.length ? pick(shoes.filter(s => NEUTRALS.includes(s.colour)).length ? shoes.filter(s => NEUTRALS.includes(s.colour)) : shoes) : null;
+  const layer = layers.length && Math.random() < 0.5 ? pick(layers) : null;
+  const picked = [best.t, best.b, layer, shoe].filter(Boolean);
+  const ids = picked.map(i => i.id);
+  const fig = i => `<figure><img src="${i.img}"><br>${SLOT_LABEL[i.cat]} · ${i.colour}</figure>`;
   document.getElementById('outfitBox').innerHTML = `
     <div class="card">
       <div class="outfit">${fig(best.t)}${fig(best.b)}</div>
-      ${layer ? `<div style="width:50%;margin:10px auto 0"><figure style="margin:0;text-align:center;font-size:12px;color:var(--muted)"><img src="${layer.img}" style="width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:12px"><br>${layer.cat} · ${layer.colour}</figure></div>` : ''}
-      ${shoe ? `<div style="width:60%;margin:10px auto 0"><figure style="margin:0;text-align:center;font-size:12px;color:var(--muted)"><img src="${shoe.img}" style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:12px"><br>${shoe.cat} · ${shoe.colour}</figure></div>` : ''}
-      <p class="tip" style="margin-top:12px">${TIPS[todayOcc]}</p>
+      ${layer ? `<div style="width:50%;margin:10px auto 0">${fig(layer)}</div>` : ''}
+      ${shoe ? `<div style="width:60%;margin:10px auto 0">${fig(shoe)}</div>` : ''}
       <button class="primary" onclick='wearIt(${JSON.stringify(ids)})'>I'm wearing this</button>
       <button class="ghost" style="width:100%;margin-top:8px" onclick='tryOutfit(${JSON.stringify(ids)})'>Try this on my photo</button>
     </div>`;
@@ -359,14 +417,13 @@ function wearIt(ids) {
   alert('Logged. These pieces will rest for 3 days.');
 }
 
-// ----- try on -----
+// ----- try on (manual) -----
 function setMyPhoto(input) {
   const f = input.files[0];
   if (!f) return;
   shrink(f, 1000).then(d => {
     try { localStorage.setItem('wd_myphoto', d); } catch (e) { alert('Photo too large to store.'); return; }
     renderTry();
-    autoFit();
   });
 }
 function renderTry() {
@@ -386,8 +443,8 @@ function renderPicker() {
   }).join('');
 }
 function makePiece(it) {
-  const g = GROUP_OF[it.cat], d = DEFAULT_POS[g];
-  return { id: it.id, src: it.img, cat: it.cat, group: g, x: d.x, y: d.y, w: d.w };
+  const d = DEFAULT_POS[it.cat];
+  return { id: it.id, src: it.img, cat: it.cat, x: d.x, y: d.y, w: d.w };
 }
 function togglePiece(id) {
   const idx = tryItems.findIndex(t => t.id === id);
@@ -403,7 +460,6 @@ function tryOutfit(ids) {
   tryItems = ids.map(id => items.find(i => i.id === id)).filter(Boolean).map(makePiece);
   selId = null;
   show('tryon');
-  autoFit();
 }
 function renderPiecesOnStage() {
   const stage = document.getElementById('stage');
@@ -462,80 +518,6 @@ document.getElementById('stage').addEventListener('pointerdown', e => {
   if (e.target.id === 'stage' || e.target.id === 'tryBase') { selId = null; renderPiecesOnStage(); }
 });
 
-// ----- pose detection and auto-fit -----
-async function loadPose() {
-  if (poseLandmarker) return;
-  setStatus('Loading pose model (one-time, about 5 MB)…');
-  const mod = await import(MP_URL);
-  const vision = await mod.FilesetResolver.forVisionTasks(MP_WASM);
-  poseLandmarker = await mod.PoseLandmarker.createFromOptions(vision, {
-    baseOptions: { modelAssetPath: MP_MODEL },
-    runningMode: 'IMAGE',
-    numPoses: 1
-  });
-}
-
-async function autoFit() {
-  const base = document.getElementById('tryBase');
-  if (!base.src || !base.naturalWidth) return;
-  if (!tryItems.length) { setStatus('Add some pieces first, then tap Auto-fit.'); return; }
-  try {
-    await loadPose();
-  } catch (e) {
-    setStatus('Could not load the pose model. Check your internet connection and try again.');
-    return;
-  }
-  setStatus('Finding your body…');
-  const res = poseLandmarker.detect(base);
-  const lm = res.landmarks && res.landmarks[0];
-  if (!lm) { setStatus('No person found. Use a full-body photo with a plain background.'); return; }
-
-  const W = base.naturalWidth, H = base.naturalHeight;
-  const P = i => ({ x: lm[i].x * W, y: lm[i].y * H, v: lm[i].visibility ?? 1 });
-  const ls = P(11), rs = P(12), lh = P(23), rh = P(24);
-  const lk = P(25), rk = P(26), la = P(27), ra = P(28);
-  const lhl = P(29), rhl = P(30), lt = P(31), rt = P(32);
-  const shoulderMid = { x: (ls.x + rs.x) / 2, y: (ls.y + rs.y) / 2 };
-  const hipMid = { x: (lh.x + rh.x) / 2, y: (lh.y + rh.y) / 2 };
-  const kneeY = (lk.y + rk.y) / 2, ankleY = (la.y + ra.y) / 2;
-  const shoulderW = Math.hypot(rs.x - ls.x, rs.y - ls.y);
-
-  for (const t of tryItems) {
-    const c = await cutout(t.src);
-    const ar = c.naturalWidth / c.naturalHeight;   // width / height of the piece
-    let leftPx, topPx, wPx;
-    if (t.group === 'top') {
-      wPx = shoulderW * 1.45;
-      leftPx = shoulderMid.x - wPx / 2;
-      topPx = shoulderMid.y - H * 0.03;
-    } else if (t.group === 'layer') {
-      wPx = shoulderW * 1.65;
-      leftPx = shoulderMid.x - wPx / 2;
-      topPx = shoulderMid.y - H * 0.04;
-    } else if (t.group === 'bottom') {
-      // trousers and joggers run to the ankle, shorts stop around the knee
-      const bottomY = t.cat === 'shorts' ? kneeY : ankleY;
-      const hPx = (bottomY - hipMid.y) * 1.02;
-      wPx = hPx * ar;
-      leftPx = hipMid.x - wPx / 2;
-      topPx = hipMid.y - H * 0.01;
-    } else { // shoes
-      const footLen = Math.max(Math.abs(lt.x - lhl.x), Math.abs(rt.x - rhl.x), 1);
-      const cx = (lhl.x + lt.x + rhl.x + rt.x) / 4;
-      wPx = footLen * 1.5;
-      leftPx = cx - wPx / 2;
-      const bottomY = Math.max(lhl.y, lt.y, rhl.y, rt.y) + H * 0.01;
-      topPx = bottomY - wPx / ar;
-    }
-    t.x = leftPx / W * 100;
-    t.y = topPx / H * 100;
-    t.w = wPx / W * 100;
-  }
-  renderPiecesOnStage();
-  setStatus('Fitted. Drag to fine-tune, then save.');
-}
-
-// ----- save composite -----
 function savePhoto() {
   const base = document.getElementById('tryBase');
   if (!base.naturalWidth) return;
@@ -557,7 +539,7 @@ function savePhoto() {
   }, 'image/png');
 }
 
-setupForms();
+setupChips();
 renderWardrobe();
 </script>
 </body>
