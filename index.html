@@ -198,7 +198,7 @@ function cutout(src) {
 
 // ----- colour detection -----
 // Averages the visible (non-background) pixels, then maps the average to a named colour.
-async function detectColour(src) {
+async function detectColourOld(src) {
   const cut = await cutout(src);
   const c = document.createElement('canvas');
   const s = Math.min(1, 120 / Math.max(cut.naturalWidth, cut.naturalHeight));
@@ -213,6 +213,45 @@ async function detectColour(src) {
   }
   if (!n) return 'other';
   return nameColour(r / n, g / n, b / n);
+}
+
+// Works on model photos and studio backgrounds too:
+// 1. Estimates the background colour from the photo's edges.
+// 2. Ignores pixels close to that colour and near-white pixels.
+// 3. Takes the most common remaining colour, which is usually the garment.
+async function detectColour(src) {
+  const img = await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = src; });
+  const s = Math.min(1, 160 / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.naturalWidth * s));
+  c.height = Math.max(1, Math.round(img.naturalHeight * s));
+  const x = c.getContext('2d');
+  x.drawImage(img, 0, 0, c.width, c.height);
+  const p = x.getImageData(0, 0, c.width, c.height).data;
+  const w = c.width, h = c.height;
+
+  let br = 0, bg = 0, bb = 0, bn = 0;
+  const edge = (xx, yy) => { const k = (yy * w + xx) * 4; br += p[k]; bg += p[k+1]; bb += p[k+2]; bn++; };
+  for (let xx = 0; xx < w; xx++) { edge(xx, 0); edge(xx, h - 1); }
+  for (let yy = 0; yy < h; yy++) { edge(0, yy); edge(w - 1, yy); }
+  br /= bn; bg /= bn; bb /= bn;
+
+  const counts = new Map();
+  for (let i = 0; i < p.length; i += 4) {
+    const r = p[i], g = p[i+1], b = p[i+2];
+    const dr = r - br, dg = g - bg, db = b - bb;
+    if (dr*dr + dg*dg + db*db < 40*40) continue;      // looks like the background
+    if (r > 235 && g > 235 && b > 235) continue;      // white
+    if (p[i+3] < 128) continue;                       // transparent
+    const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+    const e = counts.get(key) || { n:0, r:0, g:0, b:0 };
+    e.n++; e.r += r; e.g += g; e.b += b;
+    counts.set(key, e);
+  }
+  let best = null;
+  counts.forEach(e => { if (!best || e.n > best.n) best = e; });
+  if (!best || best.n < 20) return 'other';
+  return nameColour(best.r / best.n, best.g / best.n, best.b / best.n);
 }
 
 function rgbToHsl(r, g, b) {
