@@ -248,10 +248,18 @@ async function detectColour(src) {
     e.n++; e.r += r; e.g += g; e.b += b;
     counts.set(key, e);
   }
-  let best = null;
-  counts.forEach(e => { if (!best || e.n > best.n) best = e; });
-  if (!best || best.n < 20) return 'other';
-  return nameColour(best.r / best.n, best.g / best.n, best.b / best.n);
+  // Merge shades that share a name, then keep every colour covering at least 15% of the garment
+  const byName = {};
+  let total = 0;
+  counts.forEach(e => {
+    const name = nameColour(e.r / e.n, e.g / e.n, e.b / e.n);
+    byName[name] = (byName[name] || 0) + e.n;
+    total += e.n;
+  });
+  if (total < 20) return ['other'];
+  const sorted = Object.entries(byName).sort((a, b) => b[1] - a[1]);
+  const significant = sorted.filter(([, n]) => n / total >= 0.15).map(([k]) => k);
+  return significant.length ? significant : [sorted[0][0]];
 }
 
 function rgbToHsl(r, g, b) {
@@ -333,8 +341,8 @@ async function saveItems() {
   for (const img of pendingPhotos) {
     const cut = await cutout(img);
     const slot = guessSlot(cut);
-    const colour = await detectColour(img);
-    items.push({ id: String(Date.now() + Math.random()), img, cat: slot, colour });
+    const colours = await detectColour(img);
+    items.push({ id: String(Date.now() + Math.random()), img, cat: slot, colour: colours[0], colours });
   }
   save();
   pendingPhotos = [];
@@ -389,7 +397,8 @@ function renderWardrobe() {
       <img src="${i.img}" alt="">
       <div class="meta">
         <b>${SLOT_LABEL[i.cat]}</b>
-        <span class="swatch" style="background:${swatchFor(i.colour)}"></span>${i.colour}
+        ${(i.colours || [i.colour]).map(c => `<span class="swatch" style="background:${swatchFor(c)}"></span>${c}`).join(' + ')}
+        ${(i.colours || []).length > 1 ? '<span class="tag">multi-colour</span>' : ''}
         <div style="margin-top:6px;display:flex;gap:6px"><button class="ghost" onclick="moveItem('${i.id}')">Move</button><button class="ghost" onclick="removeItem('${i.id}')">Delete</button></div>
       </div>
     </div>`).join('');
@@ -406,6 +415,7 @@ function removeItem(id) {
 
 // ----- outfit suggestion -----
 function colourScore(a, b) {
+  if ((a.colours || []).length > 1 || (b.colours || []).length > 1) return 1;
   if (a.colour === b.colour && !NEUTRALS.includes(a.colour)) return -3;
   if (NEUTRALS.includes(a.colour) || NEUTRALS.includes(b.colour)) return 2;
   return 0;
