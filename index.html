@@ -43,6 +43,7 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
 .piece.sel { outline:2px dashed var(--accent); outline-offset:2px; }
 .thumbbtn { padding:0; border:2px solid transparent; border-radius:10px; overflow:hidden; background:none; }
 .thumbbtn.in { border-color:var(--accent); }
+.item.sel { outline:3px solid var(--accent); outline-offset:-3px; }
 .swatch { display:inline-block; width:10px; height:10px; border-radius:50%; border:1px solid var(--line); vertical-align:middle; margin-right:4px; }
 </style>
 </head>
@@ -61,7 +62,12 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
 <main>
   <!-- WARDROBE -->
   <section id="view-wardrobe">
-    <div class="chips" id="filterChips" style="margin-bottom:14px"></div>
+    <div class="chips" id="filterChips" style="margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="ghost" id="selBtn" onclick="toggleSelectMode()">Select</button>
+      <button class="ghost" id="delSelBtn" onclick="deleteSelected()" style="display:none">Delete selected</button>
+      <button class="ghost" onclick="clearAll()">Clear all</button>
+    </div>
     <div id="wardrobeGrid" class="grid"></div>
     <div id="wardrobeEmpty" class="empty hidden">Nothing here yet. Tap Add to upload photos.</div>
   </section>
@@ -392,8 +398,9 @@ function moveItem(id) {
 function renderWardrobe() {
   const list = items.filter(i => filter === 'all' || i.cat === filter);
   document.getElementById('wardrobeEmpty').classList.toggle('hidden', list.length > 0);
+  updateSelUI();
   document.getElementById('wardrobeGrid').innerHTML = list.map(i => `
-    <div class="item">
+    <div class="item ${selected.has(i.id) ? 'sel' : ''}" onclick="cardTap('${i.id}')">
       <img src="${i.img}" alt="">
       <div class="meta">
         <b>${SLOT_LABEL[i.cat]}</b>
@@ -407,6 +414,41 @@ function swatchFor(c) {
   return { black:'#111', white:'#fafafa', grey:'#888', navy:'#1f2a44', denim:'#5b7fa6', blue:'#3f6fb5',
            beige:'#d8c8a8', olive:'#6b7040', brown:'#6b4a2f', green:'#3c7a4a', red:'#c0392b',
            maroon:'#6d1f2a', pastel:'#f4c7d6', purple:'#7d4f9b', other:'#999' }[c] || '#999';
+}
+let selectMode = false;
+let selected = new Set();
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  selected.clear();
+  document.getElementById('selBtn').textContent = selectMode ? 'Cancel' : 'Select';
+  renderWardrobe();
+}
+function cardTap(id) {
+  if (!selectMode) return;
+  selected.has(id) ? selected.delete(id) : selected.add(id);
+  renderWardrobe();
+}
+function updateSelUI() {
+  const btn = document.getElementById('delSelBtn');
+  if (btn) {
+    btn.style.display = selectMode && selected.size ? '' : 'none';
+    btn.textContent = `Delete selected (${selected.size})`;
+  }
+}
+function deleteSelected() {
+  if (!selected.size) return;
+  if (!confirm(`Delete ${selected.size} item(s)?`)) return;
+  items = items.filter(i => !selected.has(i.id));
+  selected.clear(); selectMode = false;
+  document.getElementById('selBtn').textContent = 'Select';
+  save(); renderWardrobe();
+}
+function clearAll() {
+  if (!items.length) return;
+  if (!confirm(`Delete all ${items.length} items from your wardrobe?`)) return;
+  items = []; selected.clear(); selectMode = false;
+  document.getElementById('selBtn').textContent = 'Select';
+  save(); renderWardrobe();
 }
 function removeItem(id) {
   if (!confirm('Delete this item?')) return;
