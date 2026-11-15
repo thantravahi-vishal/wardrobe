@@ -77,9 +77,10 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
 
   <section id="view-add" class="hidden">
     <div class="card">
-      <label>Choose photos. You'll crop each one next.</label>
+      <label>Choose photos. One item per photo works best, like a shirt, trousers or shoes on a plain background.</label>
       <input type="file" id="photo" accept="image/*" multiple>
-      <p class="tip" style="font-size:12px;color:var(--muted)">Crop tightly around one garment or one pair of shoes. Background removal is on by default.</p>
+      <p class="tip" style="font-size:12px;color:var(--muted)">Backgrounds are removed automatically. Photos of a person wearing the item will keep the person too, so use product or flat-lay photos.</p>
+      <div id="addStatus" class="tip" style="font-size:13px;color:var(--muted)"></div>
     </div>
   </section>
 
@@ -109,7 +110,7 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
       <label>Background strength: <span id="tolVal">50</span></label>
       <input type="range" id="tol" min="15" max="110" value="50" oninput="document.getElementById('tolVal').textContent=this.value" onchange="applyTol()">
       <p class="tip" style="font-size:12px;color:var(--muted)">Lower it if parts of the garment disappear. Raise it if background is left behind.</p>
-      <div class="chips" style="margin:10px 0"><span class="chip" id="eraseBtn" onclick="toggleErase()">Erase leftover background: off</span></div>
+      <div class="chips" style="margin:10px 0"><span class="chip" id="eraseBtn" onclick="toggleErase()">Erase leftover background: off</span><span class="chip" id="restoreBtn" onclick="toggleRestore()">Restore original: off</span></div>
       <p class="tip" style="font-size:12px;color:var(--muted)">With erase on, drag over any leftover background to remove it.</p>
       <button class="ghost" style="width:100%;margin-bottom:6px" onclick="aiRemoveBg()">Remove background with AI</button>
       <div id="aiStatus" class="tip" style="font-size:12px;color:var(--muted)"></div>
@@ -350,13 +351,18 @@ function rgbToHsl(r, g, b) {
 
 function nameColour(r, g, b) {
   const { h, s, l } = rgbToHsl(r, g, b);
-  if (s < 0.12) { if (l < 0.18) return 'black'; if (l > 0.85) return 'white'; return 'grey'; }
-  if (l > 0.75) return 'pastel';
+  if (s < 0.12) {
+    if (l < 0.18) return 'black';
+    if (l > 0.85) return 'white';
+    if (h >= 20 && h < 70 && l > 0.45) return 'beige';
+    return 'grey';
+  }
+  if (l > 0.75) return (h >= 20 && h < 70 && s < 0.5) ? 'beige' : 'pastel';
   if (h >= 190 && h < 255) { if (l < 0.3) return 'navy'; if (s < 0.35) return 'denim'; return 'blue'; }
   if (h >= 18 && h < 45) { if (s < 0.5 && l > 0.5) return 'beige'; return 'brown'; }
   if (h >= 45 && h < 75 && s < 0.4) return 'beige';
   if (h >= 60 && h < 110 && s < 0.6) return 'olive';
-  if (h >= 75 && h < 170) return 'green';
+  if (h >= 75 && h < 190) return 'green';
   if (h >= 255 && h < 330) return 'purple';
   if (l < 0.35) return 'maroon';
   return 'red';
@@ -388,10 +394,57 @@ function setupChips() {
 function setFilter(f) { filter = f; setupChips(); renderWardrobe(); }
 
 // ---------- add: crop each photo, then save ----------
-document.getElementById('photo').addEventListener('change', e => {
-  cropQueue = [...e.target.files];
+// Fully automatic: AI background removal, trim, slot guess and colour detection. No manual steps.
+let imglyFn = null;
+async function getImgly() {
+  if (!imglyFn) {
+    const mod = await import(IMGLY_URL);
+    imglyFn = mod.removeBackground || mod.default;
+  }
+  return imglyFn;
+}
+
+async function autoRemoveBg(canvas) {
+  const fn = await getImgly();
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+  const out = await fn(blob, { publicPath: IMGLY_PUBLIC });
+  const outBlob = out && out.convertToBlob ? await out.convertToBlob('image/png') : out;
+  return toCanvas(await loadImg(URL.createObjectURL(outBlob)));
+}
+
+async function processPhoto(file, n, total) {
+  const st = document.getElementById('addStatus');
+  st.textContent = `Processing ${n} of ${total}… the first time, the AI model downloads (about 40 MB).`;
+  const img = await loadImg(URL.createObjectURL(file));
+  const s = Math.min(1, 900 / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.naturalWidth * s));
+  c.height = Math.max(1, Math.round(img.naturalHeight * s));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  let cut;
+  try {
+    cut = await autoRemoveBg(c);
+  } catch (e) {
+    cut = c;
+    removeBg(cut);
+    st.textContent = 'AI model unavailable, so basic background removal was used for this photo.';
+  }
+  const data = trimCanvas(cut).toDataURL('image/png');
+  const slot = await guessSlot(data);
+  const colours = await detectColour(data);
+  items.push({ id: String(Date.now() + Math.random()), img: data, cat: slot, colour: colours[0], colours, cv: 2 });
+}
+
+document.getElementById('photo').addEventListener('change', async e => {
+  const files = [...e.target.files];
   e.target.value = '';
-  if (cropQueue.length) nextCrop();
+  for (let i = 0; i < files.length; i++) {
+    try { await processPhoto(files[i], i + 1, files.length); }
+    catch (err) { document.getElementById('addStatus').textContent = 'Could not process one photo: ' + (err.message || err); }
+  }
+  save();
+  document.getElementById('addStatus').textContent = `Added ${files.length} item(s). Check their slots on the Wardrobe tab; use Move if one is wrong.`;
+  show('wardrobe');
 });
 
 function nextCrop() {
@@ -442,6 +495,7 @@ function drawCropBox() {
 
 let cropCanvas = null;
 let eraseOn = false;
+let restoreOn = false;
 
 // Step 1 of saving: crop the photo into a canvas and open the clean-up screen
 function cropSave() {
@@ -473,8 +527,20 @@ function applyTol() {
 
 function toggleErase() {
   eraseOn = !eraseOn;
+  if (eraseOn) restoreOn = false;
+  refreshBrushChips();
+}
+
+function toggleRestore() {
+  restoreOn = !restoreOn;
+  if (restoreOn) eraseOn = false;
+  refreshBrushChips();
+}
+
+function refreshBrushChips() {
   document.getElementById('eraseBtn').textContent = 'Erase leftover background: ' + (eraseOn ? 'on' : 'off');
-  document.getElementById('cleanCanvas').style.touchAction = eraseOn ? 'none' : 'auto';
+  document.getElementById('restoreBtn').textContent = 'Restore original: ' + (restoreOn ? 'on' : 'off');
+  document.getElementById('cleanCanvas').style.touchAction = (eraseOn || restoreOn) ? 'none' : 'auto';
 }
 
 function backToCrop() {
@@ -490,12 +556,19 @@ function backToCrop() {
     const k = cc.width / r.width;
     const x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k;
     const ctx = cc.getContext('2d');
+    if (restoreOn) {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(x, y, 22 * k, 0, Math.PI * 2); ctx.clip();
+      ctx.drawImage(cropCanvas, 0, 0, cc.width, cc.height);
+      ctx.restore();
+      return;
+    }
     ctx.globalCompositeOperation = 'destination-out';
     ctx.beginPath(); ctx.arc(x, y, 22 * k, 0, Math.PI * 2); ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
   };
   cc.addEventListener('pointerdown', e => {
-    if (!eraseOn) return;
+    if (!eraseOn && !restoreOn) return;
     e.preventDefault(); drawing = true;
     cc.setPointerCapture(e.pointerId); dab(e);
   });
@@ -909,6 +982,21 @@ function savePhoto() {
 
 setupChips();
 renderWardrobe();
+
+// Recalculates colours for items saved with the older rules (runs once per item)
+(async function refreshColours() {
+  let changed = false;
+  for (const i of items) {
+    if (i.cv === 2) continue;
+    try {
+      i.colours = await detectColour(i.img);
+      i.colour = i.colours[0];
+    } catch (e) { /* keep the old value if detection fails */ }
+    i.cv = 2;
+    changed = true;
+  }
+  if (changed) { save(); renderWardrobe(); }
+})();
 </script>
 </body>
 </html>
