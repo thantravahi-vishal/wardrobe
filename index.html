@@ -394,6 +394,54 @@ function setupChips() {
 function setFilter(f) { filter = f; setupChips(); renderWardrobe(); }
 
 // ---------- add: crop each photo, then save ----------
+// Primary model: BiRefNet-lite (MIT licence), run in the browser with Transformers.js on WebGPU.
+// The photo is not uploaded. The model is downloaded once and cached.
+const TF_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/+esm';
+const BIREF_ID = 'shozebDev/birefnet-lite-512-onnx';
+let segPipe = null;
+
+async function getSegmenter() {
+  if (!segPipe) {
+    const tf = await import(TF_URL);
+    segPipe = await tf.pipeline('image-segmentation', BIREF_ID, { device: 'webgpu', dtype: 'fp32' });
+  }
+  return segPipe;
+}
+
+async function birefRemoveBg(canvas) {
+  const seg = await getSegmenter();
+  const out = await seg(canvas.toDataURL('image/png'));
+  const m = out[0].mask;                       // grayscale mask from the model
+  const w = canvas.width, h = canvas.height;
+
+  // Turn the mask into a canvas, scaled to the photo size
+  const mc = document.createElement('canvas');
+  mc.width = m.width; mc.height = m.height;
+  const mctx = mc.getContext('2d');
+  const mimg = mctx.createImageData(m.width, m.height);
+  for (let i = 0; i < m.width * m.height; i++) {
+    const v = m.data[i * m.channels];          // first channel holds the mask value
+    mimg.data[i * 4] = mimg.data[i * 4 + 1] = mimg.data[i * 4 + 2] = v;
+    mimg.data[i * 4 + 3] = 255;
+  }
+  mctx.putImageData(mimg, 0, 0);
+  const scaled = document.createElement('canvas');
+  scaled.width = w; scaled.height = h;
+  const sctx = scaled.getContext('2d');
+  sctx.drawImage(mc, 0, 0, w, h);
+  const maskPx = sctx.getImageData(0, 0, w, h).data;
+
+  // Apply the mask as transparency on the photo
+  const result = document.createElement('canvas');
+  result.width = w; result.height = h;
+  const rctx = result.getContext('2d');
+  rctx.drawImage(canvas, 0, 0);
+  const rimg = rctx.getImageData(0, 0, w, h);
+  for (let i = 0; i < w * h; i++) rimg.data[i * 4 + 3] = maskPx[i * 4];
+  rctx.putImageData(rimg, 0, 0);
+  return result;
+}
+
 // Fully automatic: AI background removal, trim, slot guess and colour detection. No manual steps.
 let imglyFn = null;
 async function getImgly() {
@@ -423,11 +471,16 @@ async function processPhoto(file, n, total) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   let cut;
   try {
-    cut = await autoRemoveBg(c);
-  } catch (e) {
-    cut = c;
-    removeBg(cut);
-    st.textContent = 'AI model unavailable, so basic background removal was used for this photo.';
+    cut = await birefRemoveBg(c);
+  } catch (e1) {
+    try {
+      cut = await autoRemoveBg(c);
+      st.textContent = 'BiRefNet unavailable on this device, so the fallback model was used.';
+    } catch (e2) {
+      cut = c;
+      removeBg(cut);
+      st.textContent = 'AI models unavailable, so basic background removal was used for this photo.';
+    }
   }
   const data = trimCanvas(cut).toDataURL('image/png');
   const slot = await guessSlot(data);
