@@ -111,6 +111,8 @@ button.ghost { padding:10px 12px; border:1px solid var(--line); background:var(-
       <p class="tip" style="font-size:12px;color:var(--muted)">Lower it if parts of the garment disappear. Raise it if background is left behind.</p>
       <div class="chips" style="margin:10px 0"><span class="chip" id="eraseBtn" onclick="toggleErase()">Erase leftover background: off</span></div>
       <p class="tip" style="font-size:12px;color:var(--muted)">With erase on, drag over any leftover background to remove it.</p>
+      <button class="ghost" style="width:100%;margin-bottom:6px" onclick="aiRemoveBg()">Remove background with AI</button>
+      <div id="aiStatus" class="tip" style="font-size:12px;color:var(--muted)"></div>
       <div class="grid">
         <button class="ghost" onclick="backToCrop()">Back</button>
         <button class="primary" style="margin-top:0" onclick="cleanSave()">Save piece</button>
@@ -501,6 +503,33 @@ function backToCrop() {
   cc.addEventListener('pointerup', () => { drawing = false; });
 })();
 
+// On-device AI background removal (IMG.LY). Runs in the browser; the photo is not uploaded.
+// The model is downloaded once on first use and cached by the browser.
+const IMGLY_URL = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.0/dist/index.mjs';
+const IMGLY_PUBLIC = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.0/dist/';
+
+async function aiRemoveBg() {
+  const st = document.getElementById('aiStatus');
+  if (!cropCanvas) return;
+  st.textContent = 'Loading the AI model. The first time, this downloads about 40 MB…';
+  try {
+    const mod = await import(IMGLY_URL);
+    const fn = mod.removeBackground || mod.default;
+    const blob = await new Promise(res => cropCanvas.toBlob(res, 'image/png'));
+    const out = await fn(blob, { publicPath: IMGLY_PUBLIC });
+    const outBlob = out && out.convertToBlob ? await out.convertToBlob('image/png') : out;
+    const img = await loadImg(URL.createObjectURL(outBlob));
+    const cc = document.getElementById('cleanCanvas');
+    cc.width = img.naturalWidth; cc.height = img.naturalHeight;
+    const ctx = cc.getContext('2d');
+    ctx.clearRect(0, 0, cc.width, cc.height);
+    ctx.drawImage(img, 0, 0);
+    st.textContent = 'AI background removal applied. Use erase for any leftovers. Moving the strength slider switches back to the standard method.';
+  } catch (e) {
+    st.textContent = 'AI removal failed: ' + (e.message || e) + '. Check your connection and try again.';
+  }
+}
+
 // Copies an image or canvas to a new canvas
 function toCanvas(src) {
   const c = document.createElement('canvas');
@@ -834,7 +863,7 @@ async function autoFit() {
       topPx = shoulderMid.y - H * 0.04;
     } else if (t.cat === 'bottom') {
       // trousers and joggers run to the ankle; shorts stop around the knee
-      const bottomY = ratioOf(c) > 1.35 ? ankleY : kneeY;
+      const bottomY = ankleY;
       const hPx = (bottomY - hipMid.y) * 1.02;
       wPx = hPx * ar;
       leftPx = hipMid.x - wPx / 2;
